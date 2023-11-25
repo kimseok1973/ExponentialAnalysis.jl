@@ -122,6 +122,28 @@ function describe_effect(dl::Vector, grp::Matrix, ms::Vector, ps)
     return rs, label
 end
 
+
+"""
+    predict_effect(grp::Matrix, ms::Vector, ps::parameter_tuple, sample_size::Integer)
+
+execute predict sampling of parameters(ps) and other conditions based on Exponential Modeling. 
+
+"""
+function predict_effect(grp::Matrix, ms::Vector, ps, sample_size::Integer)
+    n,m=size(grp)
+    rs = zeros(Float64, sample_size, m)
+    mdist = MixtureModel([Exponential(y) for y in ps.ys], ps.w)
+
+    r1, r2 = ps.r
+    for i = 1:n
+        for j = 1:m
+           u, u1, u2 = mexp_decomposed(r1* ms[j], r2 .* grp[:,j] .* ms[j], mdist, i)
+           rs[i,:, j] += [u, u1, u2]
+        end
+    end
+    return rs
+end
+
 cdf_r_pop(θ, recog, m) = cdf(Exponential(θ), 1.0) * recog * m
 
 @model function recoginference(dl ; n = length(dl), m = 120_000_000)
