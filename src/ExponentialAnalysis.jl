@@ -2,7 +2,7 @@ module ExponentialAnalysis
 
 using Distributions,Turing, DynamicPPL
 
-export expmodel,analysis,describe_effect, inference_recognition
+export expmodel,analysis,describe_effect, inference_recognition, predict_effect
 
 first_marker(grp)=[i for i = 1:length(grp) if grp[i] > 0] |> t-> minimum(t)
 exp_decomposed(us::Array, term::Real, i) =  [us[k] * (cdf(Exponential(term), i-k+1) - cdf(Exponential(term), i-k)) for k = 1:i] |> sum
@@ -131,14 +131,14 @@ execute predict sampling of parameters(ps) and other conditions based on Exponen
 """
 function predict_effect(grp::Matrix, ms::Vector, ps, sample_size::Integer)
     n,m=size(grp)
-    rs = zeros(Float64, sample_size, m)
+    rs = zeros(Float64, sample_size, 3, m)
     mdist = MixtureModel([Exponential(y) for y in ps.ys], ps.w)
 
     r1, r2 = ps.r
     for i = 1:n
         for j = 1:m
            u, u1, u2 = mexp_decomposed(r1* ms[j], r2 .* grp[:,j] .* ms[j], mdist, i)
-           rs[i,:, j] += [u, u1, u2]
+           rs[i, :, j] += [u, u1, u2]
         end
     end
     return rs
