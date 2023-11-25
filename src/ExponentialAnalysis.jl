@@ -26,6 +26,21 @@ sum_missing(xs) = begin
     rs * length(rs)
 end
 
+"""
+    expmodel(dl::Vector, grp::Vector or Matrix , m::Real or Vector)
+
+return the model for anlaysis function.
+dl is the number of customers' action, e.g. download of apps or purchase of materials.
+grp is the number of media action, e.g. GRP of TV. Finally, it will be exchange to the number of people that exposed by media.
+m is the population parameters that is muliplied by grp (media action).
+
+examples
+
+m = expmodel(dl::Vector, grp::Vector, m::Real)
+
+m = expmodel(dl::Vector, grp::Matrix, m::Vector)
+
+"""
 expmodel(dl, grp, m) = expdecompose(dl, grp, m)
 
 @model function expdecompose(dl::Vector, grp::Vector , m = 120_000_000 ; n = length(grp), J=first_marker(grp), K=2)
@@ -66,6 +81,16 @@ end
     end
 end
 
+"""
+    analysis(m::Model, ; nuts_step=0.65, sample_size=2000)
+
+execute sampling of model by Turing MCMC and return the tuple of parameter's mean.
+return parameter are (tuple of parameters, chain data).
+use sample
+
+    ps, chain = analysis(m)
+
+"""
 function analysis(model ; nuts_step=0.65, sample_size=2000)
     chain=sample(model, NUTS(nuts_step),sample_size)
     t = get(chain, [:r, :w, :ys, :s])
@@ -77,7 +102,7 @@ function describe_effect(dl::Vector, grp::Matrix, ms::Vector, ps)
     n,m = size(grp)
     rs = zeros(length(dl),3,m)
     n = length(dl)
-    mdist = MixtureModel([Exponential(y) for y in ps.ys], ps.w)
+    #mdist = MixtureModel([Exponential(y) for y in ps.ys], ps.w)
     edist1 = Exponential(ps.ys[1])
     edist2 = Exponential(ps.ys[2])
     for i = 1:n
