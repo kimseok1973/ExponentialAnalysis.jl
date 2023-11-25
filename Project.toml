@@ -3,6 +3,11 @@ uuid = "548ea92d-125d-4ca0-98ff-c0dd32e495e7"
 authors = ["kimseok1973 <kimseok1973@gmail.com> and contributors"]
 version = "1.0.0-DEV"
 
+[deps]
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
+DynamicPPL = "366bfd00-2699-11ea-058f-f148b4cae6d8"
+Turing = "fce5fe82-541a-59a6-adf8-730c64b5f9a0"
+
 [compat]
 julia = "1"
 
