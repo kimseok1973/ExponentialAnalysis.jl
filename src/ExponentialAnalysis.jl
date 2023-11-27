@@ -91,8 +91,8 @@ use sample
     ps, chain = analysis(m)
 
 """
-function analysis(model ; nuts_step=0.65, sample_size=2000)
-    chain=sample(model, NUTS(nuts_step),sample_size)
+function analysis(model ; nuts_step=0.65, sample_size=2000, progress=false)
+    chain=sample(model, NUTS(nuts_step),sample_size, progress=progress)
     t = get(chain, [:r, :w, :ys, :s])
     ps = (; ys=[mean(e) for e in t.ys], w=[mean(e) for e in t.w], r=[1/mean(e) for e in t.r], s=mean(t.s) )
     return ps, chain
