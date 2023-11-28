@@ -125,20 +125,30 @@ function describe_effect(dl::Vector, grp::Matrix, ms::Vector, ps)
     return rs, label
 end
 
-function describe_effect(dl::Vector, grp::Vector, ms::Integer, ps) 
-    n =length(grp)
-    rs = zeros(length(dl),3)
-    mdist = MixtureModel([Exponential(y) for y in ps.ys], ps.w)
-    for i = 1:n
-        mz = ms - sum_missing(dl[1:i])
-        _, u1, u2 = mexp_decomposed( ps.r * mz , ps.r[2] .* grp .* mz, mdist, i)
-        
-        recog_base = u1 * ps.w[1]
-        tv_effect = u2 * ps.w[2]
-        rs[i,:] = [recog_base, tv_effect]
-    end
+# It will be duplicated
+describe_effect(dl::Vector, grp::Vector, ms::Integer, ps) = describe_effect(grp::Vector, ms::Integer, ps) 
 
-    label=["recog_base" "grp_effect"]
+function describe_effect(grp::Vector, ms::Integer, ps) 
+    n=length(grp)
+    m = 1
+    rs = zeros(n,3,m)
+    #mdist = MixtureModel([Exponential(y) for y in ps.ys], ps.w)
+    edist1 = Exponential(ps.ys[1])
+    edist2 = Exponential(ps.ys[2])
+    for i = 1:n
+        for j = 1:m
+            _, u11, u12 = mexp_decomposed( ps.r[1] * ms[j] , ps.r[2] .* grp[:,j] .* ms[j] , edist1, i)
+            _, u21, u22 = mexp_decomposed( ps.r[1] * ms[j] , ps.r[2] .* grp[:,j] .* ms[j] , edist2, i)
+          
+            recog_base = u11 * ps.w[1] + u21 * ps.w[2] #u11 and u21 is recog-base
+            tv_effect_1 = u12 * ps.w[1]
+            tv_effect_2 = u22 * ps.w[2]
+            rs[i,:,j] = [recog_base, tv_effect_1, tv_effect_2]
+        end
+    end
+    ps.ys[1] > ps.ys[2] ? effect_1 = "long_grp_effect" : effect_1 = "short_grp_effect"
+    ps.ys[1] > ps.ys[2] ? effect_2 = "short_grp_effect" : effect_2 = "long_grp_effect"
+    label=["recog_base" effect_1 effect_2]
     return rs, label
 end
 
