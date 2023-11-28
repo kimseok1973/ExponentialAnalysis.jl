@@ -125,13 +125,12 @@ function describe_effect(dl::Vector, grp::Matrix, ms::Vector, ps)
     return rs, label
 end
 
-function describe_effect(dl, grp::Vector, ms::Integer, ps) 
+function describe_effect(dl::Vector, grp::Vector, ms::Integer, ps) 
     n =length(grp)
     rs = zeros(length(dl),3)
-    n = length(dl)
     mdist = MixtureModel([Exponential(y) for y in ps.ys], ps.w)
     for i = 1:n
-        mz = m - sum_missing(dl[1:i])
+        mz = ms - sum_missing(dl[1:i])
         _, u1, u2 = mexp_decomposed( ps.r * mz , ps.r[2] .* grp .* mz, mdist, i)
         
         recog_base = u1 * ps.w[1]
