@@ -10,7 +10,9 @@ exp_decomposed(us::Array, dist, i) =  [us[k] * (cdf(dist, i-k+1) - cdf(dist, i-k
 exp_decomposed(u::Real, term) =  u * cdf(Exponential(term), 1)
 
 mexp_decomposed(m, us, dist, i) = begin
+    # non GRP effect
     u1 = m * cdf(dist, 1)
+    # GRP effect
     u2 = [us[k] * (cdf(dist, i-k+1) - cdf(dist, i-k)) for k = 1:i] |> sum
     return u1 + u2, u1, u2
 end
@@ -42,6 +44,7 @@ m = expmodel(dl::Vector, grp::Matrix, m::Vector)
 
 """
 expmodel(dl, grp, m) = expdecompose(dl, grp, m)
+expmodel(dl::Vector, grp::Vector, m) = expdecompose(dl::Vector, grp::Vector, m)
 
 @model function expdecompose(dl::Vector, grp::Vector , m = 120_000_000 ; n = length(grp), J=first_marker(grp), K=2)
     s ~ Exponential(1)
@@ -121,6 +124,25 @@ function describe_effect(dl::Vector, grp::Matrix, ms::Vector, ps)
     label=["recog_base" effect_1 effect_2]
     return rs, label
 end
+
+function describe_effect(dl, grp::Vector, ms::Integer, ps) 
+    n =length(grp)
+    rs = zeros(length(dl),3)
+    n = length(dl)
+    mdist = MixtureModel([Exponential(y) for y in ps.ys], ps.w)
+    for i = 1:n
+        mz = m - sum_missing(dl[1:i])
+        _, u1, u2 = mexp_decomposed( ps.r * mz , ps.r[2] .* grp .* mz, mdist, i)
+        
+        recog_base = u1 * ps.w[1]
+        tv_effect = u2 * ps.w[2]
+        rs[i,:] = [recog_base, tv_effect]
+    end
+
+    label=["recog_base" "grp_effect"]
+    return rs, label
+end
+
 
 
 """
