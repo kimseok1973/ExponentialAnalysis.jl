@@ -46,7 +46,7 @@ m = expmodel(dl::Vector, grp::Matrix, m::Vector)
 expmodel(dl, grp, m) = expdecompose(dl, grp, m)
 expmodel(dl::Vector, grp::Vector, m) = expdecompose(dl::Vector, grp::Vector, m)
 
-@model function expdecompose(dl::Vector, grp::Vector , m = 120_000_000 ; n = length(grp), J=first_marker(grp), K=2, sum_subtract=true)
+@model function expdecompose(dl::Vector, grp::Vector , m = 120_000_000 ; n = length(grp), J=first_marker(grp), K=2, sum_subtract=false)
     s ~ Exponential(1)
     #r ~ filldist(truncated(TDist(3), 0.000000001, 0.9999),2)
     r ~ filldist(InverseGamma(2,3), 2)
