@@ -46,7 +46,7 @@ m = expmodel(dl::Vector, grp::Matrix, m::Vector)
 expmodel(dl, grp, m) = expdecompose(dl, grp, m)
 expmodel(dl::Vector, grp::Vector, m) = expdecompose(dl::Vector, grp::Vector, m)
 
-@model function expdecompose(dl::Vector, grp::Vector , m = 120_000_000 ; n = length(grp), J=first_marker(grp), K=2)
+@model function expdecompose(dl::Vector, grp::Vector , m = 120_000_000 ; n = length(grp), J=first_marker(grp), K=2, sum_subtract=true)
     s ~ Exponential(1)
     #r ~ filldist(truncated(TDist(3), 0.000000001, 0.9999),2)
     r ~ filldist(InverseGamma(2,3), 2)
@@ -56,7 +56,7 @@ expmodel(dl::Vector, grp::Vector, m) = expdecompose(dl::Vector, grp::Vector, m)
     for i = 1:n
         if dl[i] !== missing
             mdist = MixtureModel([Exponential(y) for y in ys], w)
-            mz = m - sum_missing(dl[1:i])
+            sum_subtract == true ? mz = m - sum_missing(dl[1:i]) : mz = m
             ag1= 1/r[1] * mz
             ag2= 1/r[2] .* grp .* mz 
             u, _, _ = mexp_decomposed(ag1 ,ag2 , mdist, i)
