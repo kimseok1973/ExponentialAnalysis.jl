@@ -1,0 +1,40 @@
+using CSV,DataFrames,StatsPlots
+pwd()
+df = CSV.read("src/data/GAKITSUKA.csv", DataFrame)
+@df df plot(:個人全体)
+
+using Distributions,Turing
+import ExponentialAnalysis
+
+@df df histogram(:個人全体)
+
+
+cdf_r_pop(θ, recog, m) = cdf(Exponential(θ), 1.0) * recog * m
+
+@model function rateflow(rate ; n = length(rate), m = 40_000_000)
+    r ~ truncated(Normal(10,10), 0.1, Inf)
+    p ~ truncated(Normal(0,10), 0.0001, 0.9999)
+    for i = 1:n
+        if rate[i] !== missing
+            mr = rate[i] * m
+            mr ~ NegativeBinomial(r,p)
+        end
+    end
+     
+    g ~ Gamma(r, (1-p)/p)
+    reach ~ truncated(TDist(3), 0.0000001, 0.999999)
+    s ~ Exponential(1)
+    for i = 1:n
+        if g <= 0 
+            DynamicPPL.@addlogprob! -Inf
+        else
+            if rate[i] !== missing
+                mr = rate[i] * m
+                mr ~ Normal( cdf_r_pop(g, reach, m) , s)
+            end
+        end
+    end
+end
+
+model=rateflow(df[:,:個人全体])
+c = sample(model, NUTS(), 2000)
