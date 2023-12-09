@@ -6,18 +6,33 @@ df = CSV.read("src/data/GAKITSUKA.csv", DataFrame)
 using Distributions,Turing
 import ExponentialAnalysis
 
-@df df histogram(:個人全体)
+da = df[11:end,:個人全体]
+dap = da ./100 .* 40_000_000 .|> floor
+histogram(dap,bins=20)
+plot(dap)
 
-
-cdf_r_pop(θ, recog, m) = cdf(Exponential(θ), 1.0) * recog * m
-
-@model function rateflow(rate ; n = length(rate), m = 40_000_000)
+@model function fnb(dap ; n=length(da), m=40_000_000)
     r ~ truncated(Normal(10,10), 0.1, Inf)
     p ~ truncated(Normal(0,10), 0.0001, 0.9999)
     for i = 1:n
-        if rate[i] !== missing
-            mr = rate[i] * m
-            mr ~ NegativeBinomial(r,p)
+        if dap[i] !== missing
+            dap[i] ~ NegativeBinomial(r,p)
+        end
+    end
+end
+c= sample(fnb(dap), NUTS(), 2000)
+fnbparam = get(c, [:r, :p]) |> t -> (; r = mean(t.r), p=mean(t.p))
+
+sa_fnb = rand(NegativeBinomial(fnbparam.r, fnbparam.p),length(da))
+plot!(sa_fnb)    
+
+cdf_r_pop(θ, recog, m) = cdf(Exponential(θ), 1.0) * recog * m
+@model function rateflow(dap ; n = length(dap), m = 40_000_000)
+    r ~ truncated(Normal(10,10), 0.1, Inf)
+    p ~ truncated(Normal(0,10), 0.0001, 0.9999)
+    for i = 1:n
+        if dap[i] !== missing
+            dap[i] ~ NegativeBinomial(r,p)
         end
     end
      
@@ -28,13 +43,15 @@ cdf_r_pop(θ, recog, m) = cdf(Exponential(θ), 1.0) * recog * m
         if g <= 0 
             DynamicPPL.@addlogprob! -Inf
         else
-            if rate[i] !== missing
-                mr = rate[i] * m
-                mr ~ Normal( cdf_r_pop(g, reach, m) , s)
+            if dap[i] !== missing
+                dap[i] ~ Normal( cdf_r_pop(g, reach, m) , s)
             end
         end
     end
 end
 
-model=rateflow(df[:,:個人全体])
+model=rateflow(dap)
 c = sample(model, NUTS(), 2000)
+
+ps = get(c, [:r,:p,:g,:reach,:s]) |> t-> (; r=mean(t.r), p=mean(t.p), th=(1 - mean(t.p)) /mean(t.p),  reach = mean(t.reach), s=mean(t.s))
+plot(Gamma(ps.r, ps.th))
