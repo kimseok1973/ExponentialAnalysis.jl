@@ -1,41 +1,43 @@
 using CSV,DataFrames,StatsPlots
 pwd()
 df = CSV.read("src/data/GAKITSUKA.csv", DataFrame)
-@df df plot(:個人全体)
+@df df plot(:"男 20～34才")
 
 using Distributions,Turing
 import ExponentialAnalysis
 
-da = df[11:end,:個人全体]
-dap = da ./100 .* 40_000_000 .|> floor
+da = df[20:end,:"男 20～34才"]
+histogram(da,bins=10)
+# male 20-34 3_775_000
+dap = da ./100 .* 3_775_000 .|> floor
 histogram(dap,bins=20)
 plot(dap)
 
 @model function fnb(dap ; n=length(da), m=40_000_000)
     r ~ truncated(Normal(10,10), 0.1, Inf)
-    p ~ truncated(Normal(0,10), 0.0001, 0.9999)
+    p ~ truncated(Normal(0,10), 1e-10, 0.9999)
     for i = 1:n
         if dap[i] !== missing
             dap[i] ~ NegativeBinomial(r,p)
         end
     end
 end
-c= sample(fnb(dap), NUTS(), 2000)
+c= sample(fnb(dap ; m=3_775_000), NUTS(), 2000)
 fnbparam = get(c, [:r, :p]) |> t -> (; r = mean(t.r), p=mean(t.p))
 
 sa_fnb = rand(NegativeBinomial(fnbparam.r, fnbparam.p),length(da))
-plot!(sa_fnb)    
+plot([sa_fnb,dap])    
 
 cdf_r_pop(θ, recog, m) = cdf(Exponential(θ), 1.0) * recog * m
-@model function rateflow(dap ; n = length(dap), m = 40_000_000)
+@model function rateflow(dap ; n = length(dap), m = 43_653_441)
     r ~ truncated(Normal(10,10), 0.1, Inf)
-    p ~ truncated(Normal(0,10), 0.0001, 0.9999)
+    p ~ truncated(Normal(0,10), 1e-10, 0.99999999)
     for i = 1:n
         if dap[i] !== missing
             dap[i] ~ NegativeBinomial(r,p)
         end
     end
-     
+    
     g ~ Gamma(r, (1-p)/p)
     reach ~ truncated(TDist(3), 0.0000001, 0.999999)
     s ~ Exponential(1)
@@ -44,14 +46,37 @@ cdf_r_pop(θ, recog, m) = cdf(Exponential(θ), 1.0) * recog * m
             DynamicPPL.@addlogprob! -Inf
         else
             if dap[i] !== missing
-                dap[i] ~ Normal( cdf_r_pop(g, reach, m) , s)
+                sampled_rate = cdf_r_pop(g, reach, m)
+                dap[i] ~ Normal( sampled_rate, s)
             end
         end
     end
 end
 
-model=rateflow(dap)
+model=rateflow(dap ; m=3_775_000)
 c = sample(model, NUTS(), 2000)
 
-ps = get(c, [:r,:p,:g,:reach,:s]) |> t-> (; r=mean(t.r), p=mean(t.p), th=(1 - mean(t.p)) /mean(t.p),  reach = mean(t.reach), s=mean(t.s))
-plot(Gamma(ps.r, ps.th))
+ps = get(c, [:r,:p,:g,:reach,:s]) |> t-> (; r=mean(t.r), p=mean(t.p), th=(1 - mean(t.p)) /mean(t.p), reach = mean(t.reach), s=mean(t.s))
+nbdist = NegativeBinomial(ps.r, ps.p)
+gdist = Gamma(ps.r, ps.th)
+plot(rand(nbdist, length(dap)))
+plot!(dap)
+#m = 43_653_441
+m = 3_775_000
+ss = rand(gdist,length(dap)) |> ts -> [ps.reach * m * cdf(Exponential(t),1) for t in ts]
+plot([ss,])
+
+
+@model function newone(ds ; n = length(ds), m=3_775_000)
+    r ~ truncated(Normal(10,10), 0.1, Inf)
+    p ~ truncated(Normal(0,10), 1e-10, Inf)
+    s ~ Exponential(1)
+    g ~ Gamma(r,p)
+    for i = 1:n
+        cdf_g = cdf(Exponential(g),1)
+        ds[i] ~ Normal(m * cdf_g, s)
+    end
+
+end
+
+
