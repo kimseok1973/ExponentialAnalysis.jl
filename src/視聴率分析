@@ -1,17 +1,40 @@
 using CSV,DataFrames,StatsPlots
 pwd()
 df = CSV.read("src/data/GAKITSUKA.csv", DataFrame)
-@df df plot(:"男 20～34才")
+plot(df[:,3])
 
 using Distributions,Turing
 import ExponentialAnalysis
 
-da = df[20:end,:"男 20～34才"]
+da = df[11:end,:"男 20～34才"]
 histogram(da,bins=10)
 # male 20-34 3_775_000
-dap = da ./100 .* 3_775_000 .|> floor
+m=3_775_000
+dap = da ./100 .* m .|> floor
 histogram(dap,bins=20)
 plot(dap)
+
+@model function betabino(dap ; n=length(dap), m=m)
+    p ~ truncated(Normal(0,10), 1e-9, 0.9999)
+    #v ~ DiscreteUniform(1,m)
+    #p ~ Dirac(1.0)
+    a ~ truncated(Normal(0,10), 0, Inf)
+    b ~ truncated(Normal(0,10), 0, Inf)
+    dap .~ BetaBinomial( floor(p * m), a, b ) 
+    #dap .~ BetaBinomial( m, a, b )
+end
+model = betabino(dap,; m=m)
+#c = sample(model, Gibbs(HMC(0.2, 3, :a, :b), PG(20, :v)) , 2000)
+c = sample(model, NUTS(), 2000)
+ps = get(c, [:a, :b, :p]) |> t-> (; a=mean(t.a), b=mean(t.b),p=mean(t.p)) 
+#ps = get(c, [:a, :b]) |> t-> (; a=mean(t.a), b=mean(t.b)) 
+rand(BetaBinomial( ps.p * m |> floor , ps.a, ps.b), length(dap)) |> plot 
+plot!(dap)
+bdist  = Beta(ps.a, ps.b)
+plot(bdist)
+mean(bdist)
+ps.p
+da
 
 @model function fnb(dap ; n=length(da), m=40_000_000)
     r ~ truncated(Normal(10,10), 0.1, Inf)
@@ -24,11 +47,33 @@ plot(dap)
 end
 c= sample(fnb(dap ; m=3_775_000), NUTS(), 2000)
 fnbparam = get(c, [:r, :p]) |> t -> (; r = mean(t.r), p=mean(t.p))
+GA = Gamma(fnbparam.r, (1-fnbparam.p)/fnbparam.p)
 
 sa_fnb = rand(NegativeBinomial(fnbparam.r, fnbparam.p),length(da))
 plot([sa_fnb,dap])    
 
-cdf_r_pop(θ, recog, m) = cdf(Exponential(θ), 1.0) * recog * m
+plot(GA)
+GAA=Gamma(m, mean(GA)/m)
+plot(GAA)
+
+@model function gafind(xs,m ; n = length(xs))
+    th ~ truncated(Normal(0,10), 1e-9, 0.99999)
+    p ~ truncated(Normal(0,10), 1e-9, 0.99999)
+    xs .~ NegativeBinomial(p * m, th)
+    #s ~ Exponential(1) 
+    #xs .~ filldist(Poisson(g), n)
+end
+
+model = gafind(dap,m)
+chain = sample(model, NUTS(),2000)
+
+ps = get(chain, [:th, :p]) |> t->(; th=mean(t.th), p=mean(t.p))
+NBA= NegativeBinomial(ps.p * m, ps.th)
+plot(NBA)
+
+
+
+cdf_r_pop(θ, recog, m) = cdf(Exponential(1/θ), 1.0) * recog * m
 @model function rateflow(dap ; n = length(dap), m = 43_653_441)
     r ~ truncated(Normal(10,10), 0.1, Inf)
     p ~ truncated(Normal(0,10), 1e-10, 0.99999999)
@@ -63,8 +108,8 @@ plot(rand(nbdist, length(dap)))
 plot!(dap)
 #m = 43_653_441
 m = 3_775_000
-ss = rand(gdist,length(dap)) |> ts -> [ps.reach * m * cdf(Exponential(t),1) for t in ts]
-plot([ss,])
+ss = rand(gdist,length(dap)) |> ts -> [ps.reach * m * cdf(Exponential(1/t),1) for t in ts]
+plot([ss,dap])
 
 
 @model function newone(ds ; n = length(ds), m=3_775_000)
